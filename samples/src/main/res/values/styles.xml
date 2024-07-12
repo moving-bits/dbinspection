@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="AppBaseTheme" parent="Theme.MaterialComponents" />
+
+    <!-- Application theme. -->
+    <style name="AppTheme" parent="AppBaseTheme" />
+
+
+    <style name="textinput_edittext" parent="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+        <item name="android:padding">6dip</item>
+        <item name="android:autoText">true</item>
+        <item name="android:gravity">top|left</item>
+        <item name="android:capitalize">none</item>
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="endIconMode">none</item>
+    </style>
+    <!--
+        <item name="endIconTint">@color/colorTextDark</item>
+        <item name="prefixTextColor">@color/colorTextDark</item>
+        <item name="suffixTextColor">@color/colorTextDark</item>
+    -->
+
+    <style name="textinput_edittext_singleline" parent="textinput_edittext">
+        <item name="android:singleLine">true</item>
+        <item name="endIconMode">clear_text</item>
+    </style>
+
+    <!-- for AutoCompleteTextView or EditText embedded in material TextInputLayout -->
+
+    <style name="textinput_embedded">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:inputType">text</item>
+        <item name="android:gravity">top|left</item>
+    </style>
+    <!--
+        <item name="android:textColor">@color/colorText</item>
+        <item name="colorOnSurface">@color/colorText</item>
+        <item name="android:textSize">@dimen/textSize_textinputPrimary</item>
+    -->
+
+    <style name="textinput_embedded_singleline" parent="textinput_embedded">
+        <item name="android:imeOptions">flagNoFullscreen</item>
+    </style>
+
+</resources>

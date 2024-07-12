@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">DB inspection sample app</string>
+    <string name="search">Search</string>
+    <string name="back">Back</string>
+    <string name="forward">Forward</string>
+
+    <string name="columnproperties_title">Column properties</string>
+    <string name="columnproperties_message">Field: %1$s\nType: %2$s\nStorage: %3$s</string>
+
+    <string name="title_search">Search for</string>
+    <string name="title_edit">Edit "%1$s" of row %2$d"</string>
+    <string name="title_select_table">Select table:</string>
+
+    <string name="error_no_table_selected">No table selected</string>
+    <string name="error_pkfield">"%s" is part of primary key, cannot be edited"</string>
+    <string name="update_ok">field updated</string>
+    <string name="update_error">error while updating field</string>
+</resources>

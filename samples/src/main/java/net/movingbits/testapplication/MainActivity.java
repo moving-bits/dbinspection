@@ -112,7 +112,11 @@ public class MainActivity extends DBInspectionBaseActivity implements AdapterVie
     }
 
     @Override
-    protected boolean onFieldLongClickListener(final ColumnInfo columnInfo, final int row, final int inputType, final String currentValue) {
+    protected boolean onFieldLongClickListener(final ColumnInfo columnInfo, final int row, final int inputType, final String currentValue, final boolean isPartOfPrimaryKey) {
+        if (isPartOfPrimaryKey) {
+            Toast.makeText(this, String.format(getString(R.string.error_pkfield), columnInfo.name), Toast.LENGTH_SHORT).show();
+            return true;
+        }
         input(this, String.format(getString(R.string.title_edit), columnInfo.name, row), currentValue, inputType, newValue -> {
             if (persistData(row, columnInfo.name, newValue)) {
                 Toast.makeText(this, R.string.update_ok, Toast.LENGTH_SHORT).show();
@@ -134,12 +138,6 @@ public class MainActivity extends DBInspectionBaseActivity implements AdapterVie
         final EditText editText = dialog.findViewById(R.id.input);
         editText.setText(currentValue);
         editText.setInputType(inputType);
-    }
-
-    @Override
-    protected boolean onFieldLongClickPKListener(final ColumnInfo columnInfo) {
-        Toast.makeText(this, String.format(getString(R.string.error_pkfield), columnInfo.name), Toast.LENGTH_SHORT).show();
-        return true;
     }
 
     @Override

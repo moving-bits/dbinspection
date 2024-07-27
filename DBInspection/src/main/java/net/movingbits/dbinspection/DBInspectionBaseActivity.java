@@ -269,13 +269,8 @@ public class DBInspectionBaseActivity extends AppCompatActivity {
         return false;
     }
 
-    /** will be called on long-tapping on field which is not part of a primary key => editable field */
-    protected boolean onFieldLongClickListener(final ColumnInfo columnInfo, final int row, final int inputType, final String currentValue) {
-        return false;
-    }
-
-    /** will be called on long-tapping on field which is part of a primary key => not editable field */
-    protected boolean onFieldLongClickPKListener(final ColumnInfo columnInfo) {
+    /** will be called on long-tapping on a field */
+    protected boolean onFieldLongClickListener(final ColumnInfo columnInfo, final int row, final int inputType, final String currentValue, final boolean isPartOfPrimaryKey) {
         return false;
     }
 
@@ -435,28 +430,24 @@ public class DBInspectionBaseActivity extends AppCompatActivity {
             } else if (row >= 0 && column >= 0) {
                 // edit data (if not part of primary key)
                 final ColumnInfo info = tableInfo.columns.get(column);
-                if (info.primaryKeyPosition == 0) {
-                    tv.setOnLongClickListener(v1 -> {
-                        int inputType = 0;
-                        switch (info.storageClass) {
-                            case STORAGE_INTEGER:
-                                inputType = InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_VARIATION_NORMAL | InputType.TYPE_NUMBER_FLAG_SIGNED;
-                                break;
-                            case STORAGE_REAL:
-                                inputType = InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_VARIATION_NORMAL | InputType.TYPE_NUMBER_FLAG_DECIMAL;
-                                break;
-                            default:
-                                inputType = InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_NORMAL;
-                                if (tv.getText().length() > 50) {
-                                    inputType |= InputType.TYPE_TEXT_FLAG_MULTI_LINE;
-                                }
-                                break;
-                        }
-                        return DBInspectionBaseActivity.this.onFieldLongClickListener(info, offset + row, inputType, String.valueOf(tv.getText()));
-                    });
-                } else {
-                    DBInspectionBaseActivity.this.onFieldLongClickPKListener(info);
-                }
+                tv.setOnLongClickListener(v1 -> {
+                    int inputType = 0;
+                    switch (info.storageClass) {
+                        case STORAGE_INTEGER:
+                            inputType = InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_VARIATION_NORMAL | InputType.TYPE_NUMBER_FLAG_SIGNED;
+                            break;
+                        case STORAGE_REAL:
+                            inputType = InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_VARIATION_NORMAL | InputType.TYPE_NUMBER_FLAG_DECIMAL;
+                            break;
+                        default:
+                            inputType = InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_NORMAL;
+                            if (tv.getText().length() > 50) {
+                                inputType |= InputType.TYPE_TEXT_FLAG_MULTI_LINE;
+                            }
+                            break;
+                    }
+                    return DBInspectionBaseActivity.this.onFieldLongClickListener(info, offset + row, inputType, String.valueOf(tv.getText()), info.primaryKeyPosition != 0);
+                });
             }
 
             return v;

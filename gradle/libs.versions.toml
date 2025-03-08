@@ -1,5 +1,5 @@
 [versions]
-agp = "7.2.2"
+agp = "8.0.2"
 commonsLang3 = "3.11"
 junit = "4.13.2"
 junitVersion = "1.1.5"

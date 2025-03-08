@@ -151,14 +151,20 @@ public class MainActivity extends DBInspectionBaseActivity implements AdapterVie
                 .setTitle(title)
                 .setView(R.layout.dialog_input)
                 .setPositiveButton(android.R.string.ok, (d, w) -> {
-                    final boolean[] newSelection = Arrays.copyOf(selection, items.length);
-                    AlertDialog dialog2 = new MaterialAlertDialogBuilder(activity)
-                            .setTitle(title2)
-                            .setMultiChoiceItems(items, selection, (dialog1, which, isChecked) -> {
-                                newSelection[which] = isChecked;
-                            })
-                            .setPositiveButton(android.R.string.ok, (d2, w2) -> onChangeListener.call(((EditText)((AlertDialog) d).findViewById(R.id.input)).getText().toString(), newSelection))
-                            .show();
+                    final String newSearchTerm = ((EditText)((AlertDialog) d).findViewById(R.id.input)).getText().toString();
+                    if (StringUtils.isBlank(newSearchTerm)) {
+                        // skip column selection for empty search term
+                        onChangeListener.call(newSearchTerm, getSearchColumnSelection());
+                    } else {
+                        final boolean[] newSelection = Arrays.copyOf(selection, items.length);
+                        new MaterialAlertDialogBuilder(activity)
+                                .setTitle(title2)
+                                .setMultiChoiceItems(items, selection, (dialog1, which, isChecked) -> {
+                                    newSelection[which] = isChecked;
+                                })
+                                .setPositiveButton(android.R.string.ok, (d2, w2) -> onChangeListener.call(newSearchTerm, newSelection))
+                                .show();
+                    }
                 })
                 .setNegativeButton(android.R.string.cancel, (d, w) -> d.dismiss())
                 .create();

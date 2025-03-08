@@ -17,6 +17,8 @@ import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.widget.AppCompatSpinner;
 
+import java.util.Arrays;
+
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 
 import org.apache.commons.lang3.StringUtils;
@@ -51,10 +53,12 @@ public class MainActivity extends DBInspectionBaseActivity implements AdapterVie
         findViewById(R.id.tableButtonBack).setEnabled(false);
         findViewById(R.id.tableButtonBack).setOnClickListener(v -> pagination(offset - itemsPerPage));
         findViewById(R.id.tableButtonBack).setOnLongClickListener(v -> pagination(offset - 5 * itemsPerPage));
-        final View.OnClickListener editSearch = v -> input(MainActivity.this, getString(R.string.title_search), getSearchTerm(), InputType.TYPE_CLASS_TEXT, n -> {
+        final View.OnClickListener editSearch = v -> input(MainActivity.this, getString(R.string.title_search), getSearchTerm(), InputType.TYPE_CLASS_TEXT,
+                getString(R.string.title_columnSelection), getAvailableSearchColumns(), getSearchColumnSelection(),
+                (n, selection) -> {
             final String newSearchTerm = n.trim();
-            if (!StringUtils.equals(newSearchTerm, getSearchTerm())) {
-                setSearchTerm(newSearchTerm);
+            if (!StringUtils.equals(newSearchTerm, getSearchTerm()) || !Arrays.equals(getSearchColumnSelection(), selection)) {
+                setSearchTerm(newSearchTerm, selection);
                 updateTableData(null);
             }
         });
@@ -140,9 +144,39 @@ public class MainActivity extends DBInspectionBaseActivity implements AdapterVie
         editText.setInputType(inputType);
     }
 
+    private void input(final Activity activity, final String title, final String currentValue, final int inputType,
+                       final String title2, final CharSequence[] items, final boolean[] selection,
+                       final Call2<String, boolean[]> onChangeListener) {
+        AlertDialog dialog = new MaterialAlertDialogBuilder(activity)
+                .setTitle(title)
+                .setView(R.layout.dialog_input)
+                .setPositiveButton(android.R.string.ok, (d, w) -> {
+                    final boolean[] newSelection = Arrays.copyOf(selection, items.length);
+                    AlertDialog dialog2 = new MaterialAlertDialogBuilder(activity)
+                            .setTitle(title2)
+                            .setMultiChoiceItems(items, selection, (dialog1, which, isChecked) -> {
+                                newSelection[which] = isChecked;
+                            })
+                            .setPositiveButton(android.R.string.ok, (d2, w2) -> onChangeListener.call(((EditText)((AlertDialog) d).findViewById(R.id.input)).getText().toString(), newSelection))
+                            .show();
+                })
+                .setNegativeButton(android.R.string.cancel, (d, w) -> d.dismiss())
+                .create();
+        dialog.show();
+        final EditText editText = dialog.findViewById(R.id.input);
+        editText.setText(currentValue);
+        editText.setInputType(inputType);
+    }
+
     @Override
     protected void setSearchTerm(final String newSearchTerm) {
         super.setSearchTerm(newSearchTerm);
+        ((TextView) findViewById(R.id.searchTerm)).setText(newSearchTerm);
+    }
+
+    @Override
+    protected void setSearchTerm(final String newSearchTerm, final boolean[] newSearchColumnSelection) {
+        super.setSearchTerm(newSearchTerm, newSearchColumnSelection);
         ((TextView) findViewById(R.id.searchTerm)).setText(newSearchTerm);
     }
 

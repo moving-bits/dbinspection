@@ -24,6 +24,7 @@ import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
@@ -36,6 +37,7 @@ public class DBInspectionBaseActivity extends AppCompatActivity {
     protected static final String BUNDLE_SORTASCENDING = "BUNDLE_DBI_sortAscending";
     protected static final String BUNDLE_OFFSET = "BUNDLE_DBI_offset";
     protected static final String BUNDLE_SEARCHTERM = "BUNDLE_DBI_searchTerm";
+    protected static final String BUNDLE_SEARCHCOLUMNSELECTION = "BUNDLE_DBI_searchColumnSelection";
 
     protected SQLiteDatabase database;
     protected String currentTable = "";
@@ -47,6 +49,7 @@ public class DBInspectionBaseActivity extends AppCompatActivity {
     protected int itemsPerPage = 10;
     protected int offset = 0;
     private String searchTerm;
+    private boolean[] searchColumnSelection;
     private Bundle savedInstanceState = null;
 
     // configurable items
@@ -143,13 +146,13 @@ public class DBInspectionBaseActivity extends AppCompatActivity {
             sortColumn = savedInstanceState.getString(BUNDLE_SORTCOLUMN);
             sortAscending = savedInstanceState.getBoolean(BUNDLE_SORTASCENDING);
             offset = savedInstanceState.getInt(BUNDLE_OFFSET);
-            setSearchTerm(savedInstanceState.getString(BUNDLE_SEARCHTERM));
+            setSearchTerm(savedInstanceState.getString(BUNDLE_SEARCHTERM), savedInstanceState.getBooleanArray(BUNDLE_SEARCHCOLUMNSELECTION));
             savedInstanceState = null;
         } else if (StringUtils.isNotBlank(resetToTable) && !StringUtils.equals(resetToTable, currentTable)) {
             currentTable = resetToTable;
             sortColumn = "";
             sortAscending = true;
-            setSearchTerm("");
+            setSearchTerm("", null);
         }
 
         tableInfo = getTableInfo(currentTable);
@@ -159,9 +162,29 @@ public class DBInspectionBaseActivity extends AppCompatActivity {
         final ArrayList<String> paramsAL = new ArrayList<>();
         final StringBuilder whereCondition = new StringBuilder();
         if (StringUtils.isNotBlank(searchTerm)) {
-            for (ColumnInfo column : tableInfo.columns) {
-                paramsAL.add('%' + searchTerm + '%');
-                whereCondition.append(" OR ").append(column.name).append(" LIKE ?");
+            boolean searchColumnsSelected = false;
+            if (searchColumnSelection != null) {
+                for (boolean temp : searchColumnSelection) {
+                    if (temp) {
+                        searchColumnsSelected = true;
+                        break;
+                    }
+                }
+            }
+            if (!searchColumnsSelected) {
+                for (ColumnInfo column : tableInfo.columns) {
+                    paramsAL.add('%' + searchTerm + '%');
+                    whereCondition.append(" OR ").append(column.name).append(" LIKE ?");
+                }
+            } else {
+                int col = 0;
+                for (ColumnInfo column : tableInfo.columns) {
+                    if (col < searchColumnSelection.length && searchColumnSelection[col]) {
+                        paramsAL.add('%' + searchTerm + '%');
+                        whereCondition.append(" OR ").append(column.name).append(" LIKE ?");
+                    }
+                    col++;
+                }
             }
         }
         String[] params = new String[paramsAL.size()];
@@ -316,8 +339,30 @@ public class DBInspectionBaseActivity extends AppCompatActivity {
         searchTerm = newSearchTerm;
     }
 
+    protected void setSearchTerm(final String newSearchTerm, final boolean[] newSearchColumnSelection) {
+        searchTerm = newSearchTerm;
+        searchColumnSelection = newSearchColumnSelection;
+    }
+
     protected String getSearchTerm() {
         return searchTerm;
+    }
+
+    protected CharSequence[] getAvailableSearchColumns() {
+        final CharSequence[] result = new CharSequence[tableInfo.columns.size()];
+        int col = 0;
+        for (ColumnInfo columnInfo : tableInfo.columns) {
+            result[col] = columnInfo.name;
+            col++;
+        }
+        return result;
+    }
+
+    protected boolean[] getSearchColumnSelection() {
+        if (searchColumnSelection == null) {
+            searchColumnSelection = new boolean[tableInfo.columns.size()];
+        }
+        return Arrays.copyOf(searchColumnSelection, searchColumnSelection.length);
     }
 
     private class DBInspectionAdapter extends BaseTableAdapter {
@@ -476,5 +521,6 @@ public class DBInspectionBaseActivity extends AppCompatActivity {
         outState.putBoolean(BUNDLE_SORTASCENDING, sortAscending);
         outState.putInt(BUNDLE_OFFSET, offset);
         outState.putString(BUNDLE_SEARCHTERM, searchTerm);
+        outState.putBooleanArray(BUNDLE_SEARCHCOLUMNSELECTION, searchColumnSelection);
     }
 }

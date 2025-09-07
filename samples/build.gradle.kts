@@ -4,14 +4,14 @@ plugins {
 
 android {
     namespace = "net.movingbits.testapplication"
-    compileSdk = 34
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "net.movingbits.testapplication"
         minSdk = 21
-        targetSdk = 34
-        versionCode = 1
-        versionName = "1.1"
+        targetSdk = 35
+        versionCode = 10102
+        versionName = "1.1.2"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

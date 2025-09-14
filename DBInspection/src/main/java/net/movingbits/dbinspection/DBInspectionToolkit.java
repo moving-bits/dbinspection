@@ -10,7 +10,8 @@ import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteException;
 import android.graphics.Color;
-import android.os.Bundle;
+import android.os.Parcel;
+import android.os.Parcelable;
 import android.text.InputType;
 import android.view.Gravity;
 import android.view.LayoutInflater;
@@ -19,9 +20,9 @@ import android.view.ViewGroup;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
-import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.util.Predicate;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -30,43 +31,36 @@ import java.util.List;
 
 import org.apache.commons.lang3.StringUtils;
 
-public class DBInspectionBaseActivity extends AppCompatActivity {
+public class DBInspectionToolkit implements Parcelable {
 
-    protected static final String BUNDLE_CURRENTTABLE = "BUNDLE_DBI_currentTable";
-    protected static final String BUNDLE_SORTCOLUMN = "BUNDLE_DBI_sortColumn";
-    protected static final String BUNDLE_SORTASCENDING = "BUNDLE_DBI_sortAscending";
-    protected static final String BUNDLE_OFFSET = "BUNDLE_DBI_offset";
-    protected static final String BUNDLE_SEARCHTERM = "BUNDLE_DBI_searchTerm";
-    protected static final String BUNDLE_SEARCHCOLUMNSELECTION = "BUNDLE_DBI_searchColumnSelection";
-
-    protected SQLiteDatabase database;
-    protected String currentTable = "";
+    private AppCompatActivity activity;
+    private SQLiteDatabase database;
+    private String currentTable = "";
     private Datatable dbInspectionTable;
-    protected TableInfo tableInfo;
-    protected final ArrayList<ArrayList<String>> tableData = new ArrayList<>();
-    protected String sortColumn = "";
-    protected boolean sortAscending = true;
-    protected int itemsPerPage = 10;
-    protected int offset = 0;
+    private TableInfo tableInfo;
+    private final ArrayList<ArrayList<String>> tableData = new ArrayList<>();
+    private String sortColumn = "";
+    private boolean sortAscending = true;
+    private int itemsPerPage = 10;
+    private int offset = 0;
     private String searchTerm;
     private boolean[] searchColumnSelection;
-    private Bundle savedInstanceState = null;
+    private String titleSelectTable = "Select table";
+    private int colorHeaderBackgroundColor = 0xC0FFFFFF;
+    private int colorHeaderBackgroundColorPK = Color.GRAY;
+    private int colorHeaderTextColor = Color.BLACK;
+    private int colorCellBackgroundColorOdd = 0xC0AAAAAA;
+    private int colorCellBackgroundColorEven = 0xC0666666;
+    private int colorCellTextColor = Color.WHITE;
+    private Predicate<ColumnInfo> columHeaderLongClickListener = null;
+    private Predicate5<ColumnInfo, Integer, Integer, String, Boolean> fieldLongClickListener = null;
+    private Predicate<String> updateTableDataHandler = null;
+    private int pxMargin = 10;
+    private int pxCharWidth = 22;
+    private int pxHeight = 40;
+//    private Bundle savedInstanceState = null;
 
-    // configurable items
-    protected int colorHeaderBackgroundColor = 0xC0FFFFFF;
-    protected int getColorHeaderBackgroundColorPK = Color.GRAY;
-    protected int colorHeaderTextColor = Color.BLACK;
-    protected int colorCellBackgroundColorOdd = 0xC0AAAAAA;
-    protected int colorCellBackgroundColorEven = 0xC0666666;
-    protected int colorCellTextColor = Color.WHITE;
-
-    protected int pxMargin = 10;
-    protected int pxCharWidth = 22;
-    protected int pxHeight = 40;
-
-    protected String titleSelectTable = "Select table";
-
-    protected enum StorageClass {
+    public enum StorageClass {
         STORAGE_NULL(new String[]{"", "NULL"}),
         STORAGE_INTEGER(new String[]{"INTEGER", "LONG"}),
         STORAGE_REAL(new String[]{"REAL", "FLOAT", "DOUBLE"}),
@@ -89,7 +83,7 @@ public class DBInspectionBaseActivity extends AppCompatActivity {
         }
     }
 
-    protected static class ColumnInfo {
+    public static class ColumnInfo {
         public final int position;
         public final String name;
         public final String type;
@@ -109,7 +103,7 @@ public class DBInspectionBaseActivity extends AppCompatActivity {
         }
     }
 
-    protected static class TableInfo {
+    private static class TableInfo {
         final String name;
         List<ColumnInfo> columns;
         boolean hasPrimaryKey;
@@ -121,24 +115,80 @@ public class DBInspectionBaseActivity extends AppCompatActivity {
         }
     }
 
-    @Override
-    public void onCreate(final @Nullable Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-
-        // remember for later use in updateTableData
-        this.savedInstanceState = savedInstanceState;
+    @FunctionalInterface
+    public interface Predicate5<A, B, C, D, E> {
+        boolean test(A a, B b, C c, D d, E e);
     }
 
-    protected void prepareBlankTable(final int tableId) {
+    public DBInspectionToolkit() {
+        // nothing to do here, call init()
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    // public method interface
+
+    public void init(final AppCompatActivity activity, final SQLiteDatabase database, final String titleSelectTable, final int itemsPerPage) {
+        this.activity = activity;
+        this.database = database;
+        this.titleSelectTable = titleSelectTable;
+        this.itemsPerPage = itemsPerPage;
+    }
+
+    public int getOffset() {
+        return offset;
+    }
+
+    public void setOffset(final int newOffset) {
+        this.offset = newOffset;
+    }
+
+    public int getItemsPerPage() {
+        return itemsPerPage;
+    }
+
+    public void setUpdateTableDataHandler(final Predicate<String> updateTableDataHandler) {
+        this.updateTableDataHandler = updateTableDataHandler;
+    }
+
+    /** will be called on long-tapping on column header */
+    public void setOnColumnHeaderLongClickListener(final Predicate<ColumnInfo> columnHeaderLongClickListener) {
+        this.columHeaderLongClickListener = columnHeaderLongClickListener;
+    }
+
+    /** will be called on long-tapping on a field */
+    public void setOnFieldLongClickListener(final Predicate5<ColumnInfo, Integer, Integer, String, Boolean> fieldLongClickListener) {
+        this.fieldLongClickListener = fieldLongClickListener;
+    }
+
+    public void setHeaderColors(final int colorHeaderTextColor, final int colorHeaderBackgroundColor, final int colorHeaderBackgroundColorPK) {
+        this.colorHeaderTextColor = colorHeaderTextColor;
+        this.colorHeaderBackgroundColor = colorHeaderBackgroundColor;
+        this.colorHeaderBackgroundColorPK = colorHeaderBackgroundColorPK;
+    }
+
+    public void setFieldColors(final int cellTextColor, final int colorCellBackgroundColorOdd, final int colorCellBackgroundColorEven) {
+        this.colorCellTextColor = cellTextColor;
+        this.colorCellBackgroundColorOdd = colorCellBackgroundColorOdd;
+        this.colorCellBackgroundColorEven = colorCellBackgroundColorEven;
+    }
+
+    public void setDimensions(final int pxMargin, final int pxCharWidth, final int pxHeight) {
+        this.pxMargin = pxMargin;
+        this.pxCharWidth = pxCharWidth;
+        this.pxHeight = pxHeight;
+    }
+
+    public void prepareBlankTable(final int tableId) {
         // prepare dummy table
         tableInfo = new TableInfo(currentTable);
         tableInfo.columns.add(new ColumnInfo(0, "", "INT", false, "0", 0, StorageClass.STORAGE_INTEGER));
-        dbInspectionTable = findViewById(tableId);
-        dbInspectionTable.setAdapter(new DBInspectionAdapter(this));
+        dbInspectionTable = activity.findViewById(tableId);
+        dbInspectionTable.setAdapter(new DBInspectionAdapter(activity));
     }
 
     /** updates table data; set {@code resetToTable} to reset table name, search and sort options */
-    protected boolean updateTableData(@Nullable final String resetToTable) {
+    public boolean updateTableDataDefault(@Nullable final String resetToTable) {
+        /*
         if (savedInstanceState != null && (StringUtils.isBlank(resetToTable) || StringUtils.equals(resetToTable, savedInstanceState.getString(BUNDLE_CURRENTTABLE)))) {
             if (StringUtils.isNotBlank(resetToTable)) {
                 currentTable = resetToTable;
@@ -148,7 +198,7 @@ public class DBInspectionBaseActivity extends AppCompatActivity {
             offset = savedInstanceState.getInt(BUNDLE_OFFSET);
             setSearchTerm(savedInstanceState.getString(BUNDLE_SEARCHTERM), savedInstanceState.getBooleanArray(BUNDLE_SEARCHCOLUMNSELECTION));
             savedInstanceState = null;
-        } else if (StringUtils.isNotBlank(resetToTable) && !StringUtils.equals(resetToTable, currentTable)) {
+        } else */ if (StringUtils.isNotBlank(resetToTable) && !StringUtils.equals(resetToTable, currentTable)) {
             currentTable = resetToTable;
             sortColumn = "";
             sortAscending = true;
@@ -207,9 +257,101 @@ public class DBInspectionBaseActivity extends AppCompatActivity {
             }
             moreDataAvailable = (temp.getCount() > itemsPerPage);
         }
-        dbInspectionTable.setAdapter(new DBInspectionAdapter(this));
+        dbInspectionTable.setAdapter(new DBInspectionAdapter(activity));
         return moreDataAvailable;
     }
+
+    /**
+     * read table names from current database
+     */
+    public List<String> getTablenames() {
+        final List<String> categories = new ArrayList<>();
+        categories.add(titleSelectTable);
+        try (Cursor temp = database.rawQuery("SELECT name FROM sqlite_master WHERE TYPE IN ('table') AND name NOT LIKE 'sqlite_%' ORDER BY name", null)) {
+            if (temp.moveToFirst()) {
+                final int nameIdx = temp.getColumnIndex("name");
+                if (nameIdx >= 0) {
+                    do {
+                        categories.add(temp.getString(nameIdx));
+                    } while (temp.moveToNext());
+                }
+            }
+        } catch (SQLiteException ignore) {
+            return Collections.emptyList();
+        }
+        return categories;
+    }
+
+    /** try to persist given data, returns true on success */
+    public boolean persistData(final int row, final String columnName, final String newValue) {
+        if (!tableInfo.hasPrimaryKey) {
+            return false; // cannot update content reliably without having a primary key
+        }
+        if (row < offset || row >= (offset + itemsPerPage)) {
+            return false; // invalid offset given
+        }
+        for (ColumnInfo columnInfo : tableInfo.columns) {
+            if (StringUtils.equals(columnName, columnInfo.name) && columnInfo.primaryKeyPosition == 0) {
+                // build WHERE condition from primary key
+                final ArrayList<String> whereValues = new ArrayList<>();
+                final StringBuilder whereSQL = new StringBuilder();
+                final ArrayList<String> currentValues = tableData.get(row - offset);
+                for (ColumnInfo temp : tableInfo.columns) {
+                    if (temp.primaryKeyPosition > 0) {
+                        whereSQL.append(whereSQL.length() > 0 ? " AND " : "").append(temp.name).append(" = ?");
+                        whereValues.add(currentValues.get(temp.position));
+                    }
+                }
+                if (whereValues.isEmpty()) {
+                    return false; // no pk found (should never happen)
+                }
+                // finalize query
+                final ContentValues cv = new ContentValues(1);
+                cv.put(columnInfo.name, newValue);
+                String[] params = new String[whereValues.size()];
+                params = whereValues.toArray(params);
+                final long result = database.update(tableInfo.name, cv, whereSQL.toString(), params);
+                if (result == 1) {
+                    currentValues.set(columnInfo.position, newValue);
+                }
+                return result == 1;
+            }
+        }
+        return false; // given column not found or part of a primary key
+    }
+
+    public void setSearchTerm(final String newSearchTerm) {
+        searchTerm = newSearchTerm;
+    }
+
+    public void setSearchTerm(final String newSearchTerm, final boolean[] newSearchColumnSelection) {
+        searchTerm = newSearchTerm;
+        searchColumnSelection = newSearchColumnSelection;
+    }
+
+    public String getSearchTerm() {
+        return searchTerm;
+    }
+
+    public CharSequence[] getAvailableSearchColumns() {
+        final CharSequence[] result = new CharSequence[tableInfo.columns.size()];
+        int col = 0;
+        for (ColumnInfo columnInfo : tableInfo.columns) {
+            result[col] = columnInfo.name;
+            col++;
+        }
+        return result;
+    }
+
+    public boolean[] getSearchColumnSelection() {
+        if (searchColumnSelection == null) {
+            searchColumnSelection = new boolean[tableInfo.columns.size()];
+        }
+        return Arrays.copyOf(searchColumnSelection, searchColumnSelection.length);
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    // internal methods
 
     /**
      * read column names from given table
@@ -264,105 +406,6 @@ public class DBInspectionBaseActivity extends AppCompatActivity {
         }
 
         return tableInfo;
-    }
-
-    /**
-     * read table names from current database
-     */
-    protected List<String> getTablenames() {
-        final List<String> categories = new ArrayList<>();
-        categories.add(titleSelectTable);
-        try (Cursor temp = database.rawQuery("SELECT name FROM sqlite_master WHERE TYPE IN ('table') AND name NOT LIKE 'sqlite_%' ORDER BY name", null)) {
-            if (temp.moveToFirst()) {
-                final int nameIdx = temp.getColumnIndex("name");
-                if (nameIdx >= 0) {
-                    do {
-                        categories.add(temp.getString(nameIdx));
-                    } while (temp.moveToNext());
-                }
-            }
-        } catch (SQLiteException ignore) {
-            return Collections.emptyList();
-        }
-        return categories;
-    }
-
-    /** will be called on long-tapping on column header */
-    protected boolean onColumHeaderLongClickListener(final ColumnInfo columnInfo) {
-        return false;
-    }
-
-    /** will be called on long-tapping on a field */
-    protected boolean onFieldLongClickListener(final ColumnInfo columnInfo, final int row, final int inputType, final String currentValue, final boolean isPartOfPrimaryKey) {
-        return false;
-    }
-
-    /** try to persist given data, returns true on success */
-    protected boolean persistData(final int row, final String columnName, final String newValue) {
-        if (!tableInfo.hasPrimaryKey) {
-            return false; // cannot update content reliably without having a primary key
-        }
-        if (row < offset || row >= (offset + itemsPerPage)) {
-            return false; // invalid offset given
-        }
-        for (ColumnInfo columnInfo : tableInfo.columns) {
-            if (StringUtils.equals(columnName, columnInfo.name) && columnInfo.primaryKeyPosition == 0) {
-                // build WHERE condition from primary key
-                final ArrayList<String> whereValues = new ArrayList<>();
-                final StringBuilder whereSQL = new StringBuilder();
-                final ArrayList<String> currentValues = tableData.get(row - offset);
-                for (ColumnInfo temp : tableInfo.columns) {
-                    if (temp.primaryKeyPosition > 0) {
-                        whereSQL.append(whereSQL.length() > 0 ? " AND " : "").append(temp.name).append(" = ?");
-                        whereValues.add(currentValues.get(temp.position));
-                    }
-                }
-                if (whereValues.isEmpty()) {
-                    return false; // no pk found (should never happen)
-                }
-                // finalize query
-                final ContentValues cv = new ContentValues(1);
-                cv.put(columnInfo.name, newValue);
-                String[] params = new String[whereValues.size()];
-                params = whereValues.toArray(params);
-                final long result = database.update(tableInfo.name, cv, whereSQL.toString(), params);
-                if (result == 1) {
-                    currentValues.set(columnInfo.position, newValue);
-                }
-                return result == 1;
-            }
-        }
-        return false; // given column not found or part of a primary key
-    }
-
-    protected void setSearchTerm(final String newSearchTerm) {
-        searchTerm = newSearchTerm;
-    }
-
-    protected void setSearchTerm(final String newSearchTerm, final boolean[] newSearchColumnSelection) {
-        searchTerm = newSearchTerm;
-        searchColumnSelection = newSearchColumnSelection;
-    }
-
-    protected String getSearchTerm() {
-        return searchTerm;
-    }
-
-    protected CharSequence[] getAvailableSearchColumns() {
-        final CharSequence[] result = new CharSequence[tableInfo.columns.size()];
-        int col = 0;
-        for (ColumnInfo columnInfo : tableInfo.columns) {
-            result[col] = columnInfo.name;
-            col++;
-        }
-        return result;
-    }
-
-    protected boolean[] getSearchColumnSelection() {
-        if (searchColumnSelection == null) {
-            searchColumnSelection = new boolean[tableInfo.columns.size()];
-        }
-        return Arrays.copyOf(searchColumnSelection, searchColumnSelection.length);
     }
 
     private class DBInspectionAdapter extends BaseTableAdapter {
@@ -438,7 +481,7 @@ public class DBInspectionBaseActivity extends AppCompatActivity {
                 v.setGravity(Gravity.LEFT);
                 v.setOrientation(LinearLayout.HORIZONTAL);
                 v.setPaddingRelative(1, 2, 1, 2);
-                final int bg = viewType == VIEWTYPE_HEADER_PRIMARYKEY ? getColorHeaderBackgroundColorPK : viewType == VIEWTYPE_HEADER_NONPK ? colorHeaderBackgroundColor : viewType == VIEWTYPE_DATA_EVEN ? colorCellBackgroundColorEven : colorCellBackgroundColorOdd;
+                final int bg = viewType == VIEWTYPE_HEADER_PRIMARYKEY ? colorHeaderBackgroundColorPK : viewType == VIEWTYPE_HEADER_NONPK ? colorHeaderBackgroundColor : viewType == VIEWTYPE_DATA_EVEN ? colorCellBackgroundColorEven : colorCellBackgroundColorOdd;
                 v.setBackgroundColor(bg);
 
                 tv = new TextView(inflater.getContext());
@@ -468,10 +511,14 @@ public class DBInspectionBaseActivity extends AppCompatActivity {
                         sortColumn = info.name;
                         sortAscending = true;
                     }
-                    updateTableData(null);
+                    if (updateTableDataHandler != null) {
+                        updateTableDataHandler.test(null);
+                    } else {
+                        updateTableDataDefault(null);
+                    }
                 });
                 // field info on header long tap
-                tv.setOnLongClickListener(v1 -> DBInspectionBaseActivity.this.onColumHeaderLongClickListener(info));
+                tv.setOnLongClickListener(v1 -> columHeaderLongClickListener != null && columHeaderLongClickListener.test(info));
             } else if (row >= 0 && column >= 0) {
                 // edit data (if not part of primary key)
                 final ColumnInfo info = tableInfo.columns.get(column);
@@ -491,7 +538,7 @@ public class DBInspectionBaseActivity extends AppCompatActivity {
                             }
                             break;
                     }
-                    return DBInspectionBaseActivity.this.onFieldLongClickListener(info, offset + row, inputType, String.valueOf(tv.getText()), info.primaryKeyPosition != 0);
+                    return fieldLongClickListener != null && fieldLongClickListener.test(info, offset + row, inputType, String.valueOf(tv.getText()), info.primaryKeyPosition != 0);
                 });
             }
 
@@ -513,14 +560,46 @@ public class DBInspectionBaseActivity extends AppCompatActivity {
 
     }
 
-    @Override
-    protected void onSaveInstanceState(@NonNull final Bundle outState) {
-        super.onSaveInstanceState(outState);
-        outState.putString(BUNDLE_CURRENTTABLE, currentTable);
-        outState.putString(BUNDLE_SORTCOLUMN, sortColumn);
-        outState.putBoolean(BUNDLE_SORTASCENDING, sortAscending);
-        outState.putInt(BUNDLE_OFFSET, offset);
-        outState.putString(BUNDLE_SEARCHTERM, searchTerm);
-        outState.putBooleanArray(BUNDLE_SEARCHCOLUMNSELECTION, searchColumnSelection);
+
+    // ---------------------------------------------------------------------------------------------
+    // Parcelable methods
+
+    public static final Creator<DBInspectionToolkit> CREATOR = new Creator<DBInspectionToolkit>() {
+
+        @Override
+        public DBInspectionToolkit createFromParcel(final Parcel source) {
+            return new DBInspectionToolkit(source);
+        }
+
+        @Override
+        public DBInspectionToolkit[] newArray(final int size) {
+            return new DBInspectionToolkit[size];
+        }
+
+    };
+
+    protected DBInspectionToolkit(final Parcel parcel) {
+        currentTable = parcel.readString();
+        sortColumn = parcel.readString();
+        sortAscending = parcel.readByte() > 0;
+        offset = parcel.readByte();
+        searchTerm = parcel.readString();
+        searchColumnSelection = parcel.createBooleanArray();
     }
+
+    @Override
+    public int describeContents() {
+        return 0;
+    }
+
+    @Override
+    public void writeToParcel(final Parcel dest, final int flags) {
+        dest.writeString(currentTable);
+        dest.writeString(sortColumn);
+        dest.writeByte((byte) (sortAscending ? 1 : 0));
+        dest.writeInt(offset);
+        dest.writeString(searchTerm);
+        dest.writeBooleanArray(searchColumnSelection);
+    }
+
 }

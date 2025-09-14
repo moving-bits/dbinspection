@@ -1,6 +1,6 @@
 package net.movingbits.testapplication;
 
-import net.movingbits.dbinspection.DBInspectionBaseActivity;
+import net.movingbits.dbinspection.DBInspectionToolkit;
 
 import android.annotation.SuppressLint;
 import android.app.Activity;
@@ -15,6 +15,7 @@ import android.widget.Toast;
 
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
+import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.AppCompatSpinner;
 
 import java.util.Arrays;
@@ -24,40 +25,40 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import org.apache.commons.lang3.StringUtils;
 
 /**
- * Sample application for DBInspectionBaseActivity
- * (c) 2024 moving-bits (<a href="https://github.com/moving-bits">moving-bits</a>)
+ * Sample application for DBInspectionToolkit
+ * (c) 2024-2025 moving-bits (<a href="https://github.com/moving-bits">moving-bits</a>)
  */
 
-public class MainActivity extends DBInspectionBaseActivity implements AdapterView.OnItemSelectedListener {
+public class MainActivity extends AppCompatActivity implements AdapterView.OnItemSelectedListener {
+
+    private DBInspectionToolkit toolkit;
+    private static String titleSelectTable;
 
     @Override
     public void onCreate(final @Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.dbinspection_activity);
-        prepareBlankTable(R.id.tableView);
-        database = DataStore.getDatabase(this);
-
-        // set configurable items
-        pxMargin = dpToPixel(10);
-        pxCharWidth = dpToPixel(10);
-        pxHeight = dpToPixel(40);
         titleSelectTable = getString(R.string.title_select_table);
+        toolkit = new DBInspectionToolkit();
+        toolkit.init(this, DataStore.getDatabase(this), titleSelectTable, 10);
+        toolkit.prepareBlankTable(R.id.tableView);
+        toolkit.setDimensions(dpToPixel(10), dpToPixel(10), dpToPixel(40));
 
         // initialize table selector
         final AppCompatSpinner spinner = findViewById(R.id.tableSpinner);
         spinner.setOnItemSelectedListener(this);
-        final ArrayAdapter<String> spinnerAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, getTablenames());
+        final ArrayAdapter<String> spinnerAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, toolkit.getTablenames());
         spinner.setAdapter(spinnerAdapter);
 
         // prepare UI elements
         findViewById(R.id.tableButtonBack).setEnabled(false);
-        findViewById(R.id.tableButtonBack).setOnClickListener(v -> pagination(offset - itemsPerPage));
-        findViewById(R.id.tableButtonBack).setOnLongClickListener(v -> pagination(offset - 5 * itemsPerPage));
-        final View.OnClickListener editSearch = v -> input(MainActivity.this, getString(R.string.title_search), getSearchTerm(), InputType.TYPE_CLASS_TEXT,
-                getString(R.string.title_columnSelection), getAvailableSearchColumns(), getSearchColumnSelection(),
+        findViewById(R.id.tableButtonBack).setOnClickListener(v -> pagination(toolkit.getOffset() - toolkit.getItemsPerPage()));
+        findViewById(R.id.tableButtonBack).setOnLongClickListener(v -> pagination(toolkit.getOffset() - 5 * toolkit.getItemsPerPage()));
+        final View.OnClickListener editSearch = v -> input(MainActivity.this, getString(R.string.title_search), toolkit.getSearchTerm(), InputType.TYPE_CLASS_TEXT,
+                getString(R.string.title_columnSelection), toolkit.getAvailableSearchColumns(), toolkit.getSearchColumnSelection(),
                 (n, selection) -> {
             final String newSearchTerm = n.trim();
-            if (!StringUtils.equals(newSearchTerm, getSearchTerm()) || !Arrays.equals(getSearchColumnSelection(), selection)) {
+            if (!StringUtils.equals(newSearchTerm, toolkit.getSearchTerm()) || !Arrays.equals(toolkit.getSearchColumnSelection(), selection)) {
                 setSearchTerm(newSearchTerm, selection);
                 updateTableData(null);
             }
@@ -67,12 +68,36 @@ public class MainActivity extends DBInspectionBaseActivity implements AdapterVie
         findViewById(R.id.searchTerm).setOnClickListener(editSearch);
 
         findViewById(R.id.tableButtonForward).setEnabled(false);
-        findViewById(R.id.tableButtonForward).setOnClickListener(v -> pagination(offset + itemsPerPage));
-        findViewById(R.id.tableButtonForward).setOnLongClickListener(v -> pagination(offset + 5 * itemsPerPage));
+        findViewById(R.id.tableButtonForward).setOnClickListener(v -> pagination(toolkit.getOffset() + toolkit.getItemsPerPage()));
+        findViewById(R.id.tableButtonForward).setOnLongClickListener(v -> pagination(toolkit.getOffset() + 5 * toolkit.getItemsPerPage()));
+
+        toolkit.setOnColumnHeaderLongClickListener((columnInfo -> {
+            AlertDialog dialog = new MaterialAlertDialogBuilder(this)
+                    .setTitle(R.string.columnproperties_title)
+                    .setMessage(String.format(getString(R.string.columnproperties_message), columnInfo.name, columnInfo.type, columnInfo.storageClass))
+                    .create();
+            dialog.show();
+            return true;
+        }));
+        toolkit.setOnFieldLongClickListener((columnInfo, row, inputType, currentValue, isPartOfPrimaryKey) -> {
+            if (isPartOfPrimaryKey) {
+                Toast.makeText(this, String.format(getString(R.string.error_pkfield), columnInfo.name), Toast.LENGTH_SHORT).show();
+                return true;
+            }
+            input(this, String.format(getString(R.string.title_edit), columnInfo.name, row), currentValue, inputType, newValue -> {
+                if (toolkit.persistData(row, columnInfo.name, newValue)) {
+                    Toast.makeText(this, R.string.update_ok, Toast.LENGTH_SHORT).show();
+                } else {
+                    Toast.makeText(this, R.string.update_error, Toast.LENGTH_LONG).show();
+                }
+            });
+            return true;
+        });
+        toolkit.setUpdateTableDataHandler(this::updateTableData);
     }
 
     private boolean pagination(final int newOffset) {
-        offset = Math.max(0, newOffset);
+        toolkit.setOffset(Math.max(0, newOffset));
         updateTableData(null);
         return true;
     }
@@ -91,10 +116,9 @@ public class MainActivity extends DBInspectionBaseActivity implements AdapterVie
         updateTableData(item);
     }
 
-    @Override
     protected boolean updateTableData(@Nullable final String resetToTable) {
-        final boolean moreDataAvailable = super.updateTableData(resetToTable);
-        findViewById(R.id.tableButtonBack).setEnabled(offset > 0);
+        final boolean moreDataAvailable = toolkit.updateTableDataDefault(resetToTable);
+        findViewById(R.id.tableButtonBack).setEnabled(toolkit.getOffset() > 0);
         findViewById(R.id.tableButtonSearch).setEnabled(true);
         findViewById(R.id.tableButtonForward).setEnabled(moreDataAvailable);
         return moreDataAvailable;
@@ -103,32 +127,6 @@ public class MainActivity extends DBInspectionBaseActivity implements AdapterVie
     @Override
     public void onNothingSelected(final AdapterView<?> parent) {
         Toast.makeText(parent.getContext(), R.string.error_no_table_selected, Toast.LENGTH_LONG).show();
-    }
-
-    @Override
-    protected boolean onColumHeaderLongClickListener(final ColumnInfo columnInfo) {
-        AlertDialog dialog = new MaterialAlertDialogBuilder(this)
-                .setTitle(R.string.columnproperties_title)
-                .setMessage(String.format(getString(R.string.columnproperties_message), columnInfo.name, columnInfo.type, columnInfo.storageClass))
-                .create();
-        dialog.show();
-        return true;
-    }
-
-    @Override
-    protected boolean onFieldLongClickListener(final ColumnInfo columnInfo, final int row, final int inputType, final String currentValue, final boolean isPartOfPrimaryKey) {
-        if (isPartOfPrimaryKey) {
-            Toast.makeText(this, String.format(getString(R.string.error_pkfield), columnInfo.name), Toast.LENGTH_SHORT).show();
-            return true;
-        }
-        input(this, String.format(getString(R.string.title_edit), columnInfo.name, row), currentValue, inputType, newValue -> {
-            if (persistData(row, columnInfo.name, newValue)) {
-                Toast.makeText(this, R.string.update_ok, Toast.LENGTH_SHORT).show();
-            } else {
-                Toast.makeText(this, R.string.update_error, Toast.LENGTH_LONG).show();
-            }
-        });
-        return true;
     }
 
     private void input(final Activity activity, final String title, final String currentValue, final int inputType, final Call1<String> onChangeListener) {
@@ -154,7 +152,7 @@ public class MainActivity extends DBInspectionBaseActivity implements AdapterVie
                     final String newSearchTerm = ((EditText)((AlertDialog) d).findViewById(R.id.input)).getText().toString();
                     if (StringUtils.isBlank(newSearchTerm)) {
                         // skip column selection for empty search term
-                        onChangeListener.call(newSearchTerm, getSearchColumnSelection());
+                        onChangeListener.call(newSearchTerm, toolkit.getSearchColumnSelection());
                     } else {
                         final boolean[] newSelection = Arrays.copyOf(selection, items.length);
                         new MaterialAlertDialogBuilder(activity)
@@ -174,24 +172,12 @@ public class MainActivity extends DBInspectionBaseActivity implements AdapterVie
         editText.setInputType(inputType);
     }
 
-    @Override
-    protected void setSearchTerm(final String newSearchTerm) {
-        super.setSearchTerm(newSearchTerm);
-        ((TextView) findViewById(R.id.searchTerm)).setText(newSearchTerm);
-    }
-
-    @Override
     protected void setSearchTerm(final String newSearchTerm, final boolean[] newSearchColumnSelection) {
-        super.setSearchTerm(newSearchTerm, newSearchColumnSelection);
+        toolkit.setSearchTerm(newSearchTerm, newSearchColumnSelection);
         ((TextView) findViewById(R.id.searchTerm)).setText(newSearchTerm);
     }
 
     private int dpToPixel(final float dp) {
         return (int) (getResources().getDisplayMetrics().density * dp);
-    }
-
-    @Override
-    protected void onDestroy() {
-        super.onDestroy();
     }
 }

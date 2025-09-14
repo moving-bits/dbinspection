@@ -6,7 +6,10 @@ import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.os.Bundle;
 import android.text.InputType;
+import android.util.Log;
+import android.util.TypedValue;
 import android.view.View;
+import android.view.Window;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.EditText;
@@ -17,6 +20,11 @@ import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.AppCompatSpinner;
+import androidx.core.graphics.Insets;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowCompat;
+import androidx.core.view.WindowInsetsCompat;
+import androidx.core.view.WindowInsetsControllerCompat;
 
 import java.util.Arrays;
 
@@ -94,6 +102,8 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
             return true;
         });
         toolkit.setUpdateTableDataHandler(this::updateTableData);
+
+        initEdgeToEdge();
     }
 
     private boolean pagination(final int newOffset) {
@@ -179,5 +189,30 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
 
     private int dpToPixel(final float dp) {
         return (int) (getResources().getDisplayMetrics().density * dp);
+    }
+
+    private void initEdgeToEdge() {
+        final Window currentWindow = getWindow();
+        //enable edge-to-edge downward-compatible
+        WindowCompat.enableEdgeToEdge(currentWindow);
+        //set window behaviour
+        final WindowInsetsControllerCompat windowInsetsController = WindowCompat.getInsetsController(currentWindow, currentWindow.getDecorView());
+        windowInsetsController.setSystemBarsBehavior(WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
+        //apply edge2edge to activity content view given by activityContentId
+        ViewCompat.setOnApplyWindowInsetsListener(currentWindow.getDecorView(), (v, windowInsets) -> {
+            final View activityContent = v.findViewById(R.id.activity_content);
+            if (activityContent == null) {
+                Log.w("edge2edge", "activityContent not found in " + this);
+            } else {
+                TypedValue tv = new TypedValue();
+                if (getTheme().resolveAttribute(androidx.appcompat.R.attr.actionBarSize, tv, true)) {
+                    int actionBarHeight = TypedValue.complexToDimensionPixelSize(tv.data, getResources().getDisplayMetrics());
+                    // calculate and set the activity_content's insets
+                    final Insets innerPadding = windowInsets.getInsets(WindowInsetsCompat.Type.statusBars() | WindowInsetsCompat.Type.displayCutout() | WindowInsetsCompat.Type.ime());
+                    activityContent.setPadding(innerPadding.left, innerPadding.top + actionBarHeight, innerPadding.right, innerPadding.bottom);
+                }
+            }
+            return windowInsets;
+        });
     }
 }
